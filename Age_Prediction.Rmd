@@ -1,0 +1,13 @@
+---
+title: "Age Prediction"
+author: "Peter Shen"
+date: '2018-02-19'
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+
