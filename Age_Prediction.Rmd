@@ -35,15 +35,187 @@ library(glmnet)
 
 ##### Prediction Age
 
-Load sample data
-```{r}
-train <- read.csv(file="data/sample_train.csv", stringsAsFactors = F)
-train.meta <- read.csv(file="data/sample_train_meta.csv", stringsAsFactors = F)
-test <- read.csv(file="data/sample_test.csv", stringsAsFactors = F)
-test.meta <- read.csv(file="data/sample_test_meta.csv", stringsAsFactors = F)
+Load data files
+```{r eval=F}
+load(file="data/GSE40279_r2.Rdata")
+load(file="data/GSE41169_r2.Rdata")
 ```
 
+##### 1.1) Getting age information
+```{r eval=F}
+# Age is stored in `characteristics_ch1` for training and 
+#`characteristics_ch1.6` for test in the metadata dataframes
 
+# parse the strings and extract the age information
+train.age  <- sapply(as.character(gse40279.meta$characteristics_ch1),
+                     function(ch) as.numeric(unlist(strsplit(ch, ' '))[3]))
+test.age  <- sapply(as.character(gse41169.meta$characteristics_ch1.6),
+                     function(ch) as.numeric(unlist(strsplit(ch, ' '))[2]))
+
+# remove names
+names(train.age)  <- NULL
+names(test.age)  <- NULL
+```
+
+##### 1.2) Finding common probes
+```{r, eval=F}
+# find common probes
+train.probes  <- rownames(gse40279.data)
+test.probes  <- rownames(gse41169.data)
+common.probes  <- intersect(rownames(gse41169.data), rownames(gse40279.data))
+
+# only select the common probes in training and test datasets
+train.common  <- gse40279.data[common.probes,]
+test.common  <- gse41169.data[common.probes,]
+
+# number of common probes
+length(common.probes)
+```
+
+There are 118271 common probes between the training and test set
+
+
+##### 2) Exploring training and test set
+
+For training set:
+```{r, eval=F}
+# summarize the ages in the training dataset
+summary(train.age)
+mean(train.age)
+sd(train.age)
+length(train.age)
+```
+
+Min. = 19.00
+
+1st Qu. = 54.00
+
+Median = 65.00
+
+Mean = 64.04
+
+3rd Qu. = 75.00
+
+Max. = 101.00
+
+Mean = 64.0350609756098
+
+Standard Deviation = 14.7366808073477
+
+N = 656
+
+
+For test set:
+```{r, eval=F}
+# summarize the ages in the test dataset
+summary(test.age)
+mean(test.age)
+sd(test.age)
+length(test.age)
+```
+
+Min. = 18.00
+
+1st Qu. = 24.50
+
+Median = 29.00
+
+Mean = 31.57
+
+3rd Qu. = 36.00
+
+Max. = 65.00
+
+Mean = 31.5684210526316
+
+Standard Deviation = 10.282863902318
+
+N = 95
+
+##### 3) Impute missing values
+```{r, eval=F}
+# inpute missing values based on means
+imputeData  <- function(probeData) {
+    probeData[is.na(probeData)]  <- mean(probeData, na.rm=T)
+    return(probeData)
+}
+train.common.imputed  <- t(apply(train.common, 1, imputeData))
+test.common.imputed  <- t(apply(test.common, 1, imputeData))
+```
+
+##### 4) Predict ages
+```{r, eval=F}
+# Train glmnet for prediction
+glmnet.Training.CV  <-  cv.glmnet(t(train.common.imputed), train.age,
+                                  nfolds=10,alpha=0.5,family="gaussian")
+
+# The definition of the lambda parameter:
+lambda.glmnet.Training  <-  glmnet.Training.CV$lambda.min 
+print(lambda.glmnet.Training)
+
+# calculate the coefficients at the minimum lambda value
+glmnet.coef  <- coef(glmnet.Training.CV, s=lambda.glmnet.Training)
+
+# write out the coefficients
+write.table(as.matrix(glmnet.coef), file='coefficients.csv', col.names = F, sep="\t")
+```
+
+The lambda is shrinkage parameter -- "penalization factor" for the coefficient.
+
+Lambda min = 0.6413943
+
+##### 5) R^2 and correlations
+
+```{r, eval=F}
+# R^2 and correlation for training set
+print(cor(pred.age.train, train.age)^2)
+print(cor(pred.age.train, train.age))
+
+# R^2 and correlation for training set
+print(cor(pred.age.test, test.age)^2)
+print(cor(pred.age.test, test.age))
+```
+
+For training set:
+
+R^2 = 0.9663555
+
+R = 0.9830338
+
+For test set:
+
+R^2 = 0.9007898
+
+R = 0.9490995
+
+##### 6) Plotting predicted vs actual age
+```{r, eval=F}
+# plotting predicted age vs actual age in training set
+plot(y=pred.age.train, x=train.age, ylab="Predicted Age", xlab="Actual Age", 
+     main="Actual Age vs Predicted Age in Training Set")
+```
+![](training.png)
+
+
+```{r, eval=F}
+# plotting predicted age vs actual age in test set
+plot(y=pred.age.test, x=test.age, ylab="Predicted Age", xlab="Actual Age", 
+     main="Actual Age vs Predicted Age in Test Set")
+```
+
+![](test.png)
+
+##### 7) Age acceleration and deceleration in test set
+```{r, eval=F}
+# Age accelerated
+length(which(test.age > pred.age.test))
+# Age decelerated
+length(which(test.age < pred.age.test))
+```
+
+Age acceleration = 46
+
+Age deceleration = 49
 
 
 
