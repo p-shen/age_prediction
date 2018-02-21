@@ -8,6 +8,43 @@ output: pdf_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
+library(glmnet)
 ```
+
+
+##### Background Questions
+1. EGPD Diagram
+
+* E: DNA methylation markers
+* G: None
+* P: Biological age of subject of study
+* D: Progression of cellular age of cancer cells
+
+2. DNA methylation refers to cytosine-5 methylation within CpG dinucleotides. DNA methylation in promoter regions silences gene expression by preventing transcription factor binding, thereby leading to cellular differentiation.
+
+3. Methylation markers are detected using Illumina Methylation Assay, which is built upon bisulfite sequencing. Bisulfite sequencing works by treating DNA with bisulfite which converts unmethylated cytosine to uracil via hydrolytic deamination, then subsequent sequencing can determine the methylated and unmethylated sites based on the conversion patterns.
+
+4. Horvath used the `glmnet` library for the implementation of elastic nets. The function build out the regression model is `glmnet(x=methylationIndicators, y=age)`.
+
+5. In the models build by GWAS and EWAS, the response variables are binary variables (eg. Have T2D or do not have T2D). In the linear model approach used by Horvath, the response variables are continous variables (age). In GWAS/EWAS, the predictors are significant SNP deviations from healthy controls to diseased populations as a result of a proportions test, but in linear models, the predictors are methylation markers that have significant coefficients in the model after penalization factors. This means that the approach to multiple hypothesis testing is different. in GWAS/EWAS, we define a FDR or a Bonferonni threshold to call significant, but in linear models, we penalize for added coefficients vs the predictive power of the model (eg. cost-benefit).
+
+6. The average age acceleration is the average difference between the predicted DNAm age and the chronological age of the cell. By comparing and constrasting the DNAm age and the chronological age, the differences in age acceleration of different tissue types from the same subject can infer disease state (eg. cancer tissues) or physical and mental fitness. 
+
+7. Training=656, Test=95
+
+
+##### Prediction Age
+
+Load sample data
+```{r}
+train <- read.csv(file="data/sample_train.csv", stringsAsFactors = F)
+train.meta <- read.csv(file="data/sample_train_meta.csv", stringsAsFactors = F)
+test <- read.csv(file="data/sample_test.csv", stringsAsFactors = F)
+test.meta <- read.csv(file="data/sample_test_meta.csv", stringsAsFactors = F)
+```
+
+
+
+
 
 
