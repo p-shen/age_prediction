@@ -15,10 +15,10 @@ library(glmnet)
 ##### Background Questions
 1. EGPD Diagram
 
-* E: DNA methylation markers
+* E: None
 * G: None
-* P: Biological age of subject of study
-* D: Progression of cellular age of cancer cells
+* P: DNA Methylation
+* D: Age and cancer
 
 2. DNA methylation refers to cytosine-5 methylation within CpG dinucleotides. DNA methylation in promoter regions silences gene expression by preventing transcription factor binding, thereby leading to cellular differentiation.
 
@@ -216,6 +216,122 @@ length(which(test.age < pred.age.test))
 Age acceleration = 46
 
 Age deceleration = 49
+
+
+##### Bonus
+
+##### 1)
+```{r, eval=F}
+# test if age acceleration and deceleration is different
+# between genders in the training set
+train.gender  <- gse40279.meta$characteristics_ch1.3
+train.females  <- which(train.gender=="gender: F")
+train.males  <- which(train.gender=="gender: M")
+train.females.acc  <- length(which(train.age[train.females] > pred.age.train[train.females]))
+train.females.dec  <- length(which(train.age[train.females] < pred.age.train[train.females]))
+train.males.acc  <- length(which(train.age[train.males] > pred.age.train[train.males]))
+train.males.dec  <- length(which(train.age[train.males] < pred.age.train[train.males]))
+
+chisq.test(
+    matrix(
+        c(train.females.acc, train.males.acc, 
+          train.females.dec, train.males.dec), 
+        ncol=2), correct=F)
+
+# again test for the test set
+test.gender  <- gse41169.meta$characteristics_ch1
+test.females  <- which(test.gender=="gender: Female")
+test.males  <- which(test.gender=="gender: Male")
+test.females.acc  <- length(which(test.age[test.females] > pred.age.test[test.females]))
+test.females.dec  <- length(which(test.age[test.females] < pred.age.test[test.females]))
+test.males.acc  <- length(which(test.age[test.males] > pred.age.test[test.males]))
+test.males.dec  <- length(which(test.age[test.males] < pred.age.test[test.males]))
+
+chisq.test(
+    matrix(
+        c(test.females.acc, test.males.acc, 
+          test.females.dec, test.males.dec), 
+        ncol=2), correct=F)
+```
+
+Pearson's Chi-squared test - Training Set
+
+X-squared = 1.4016, df = 1, p-value = 0.2365
+
+
+Pearson's Chi-squared test - Test Set
+
+X-squared = 0.49211, df = 1, p-value = 0.483
+
+
+Both the Chi-squared test for male and female proportions of have a p-value of more than 0.05, so we do not have enough evidence to claim that the age acceleration between males and females are different.
+
+##### 2)
+```{r, eval=F}
+# sort the top coefficients
+glmnet.coef.sorted  <- as.matrix(glmnet.coef)
+glmnet.coef.sorted  <- glmnet.coef.sorted[order(-abs(glmnet.coef.sorted)), , drop=F]
+#filter out 0
+glmnet.coef.sorted  <- glmnet.coef.sorted[glmnet.coef.sorted != 0, , drop=F]
+
+#convert to dataframe
+glmnet.coef.sorted  <- as.data.frame(glmnet.coef.sorted)
+
+# get the mappings
+source("https://bioconductor.org/biocLite.R")
+biocLite("IlluminaHumanMethylation450kanno.ilmn12.hg19")
+library(FDb.InfiniumMethylation.hg19)
+
+# map the probes to the genes
+hm450 <- get450k()
+probeset  <- rownames(glmnet.coef.sorted)[2:length(rownames(glmnet.coef.sorted))]
+probes <- hm450[probeset]
+genes  <- getNearestTSS(probes)$nearestGeneSymbol
+write.csv(genes, file='genes.csv', sep="\t")
+```
+
+##### 3)
+
+```{r, eval=F}
+# get correlation matrix and do PCA
+cor.matrix  <- cor(train.common.imputed[probeset,])
+pca  <- prcomp(cor.matrix)
+
+pca.summary  <- summary(pca)
+ind <- which(pca.summary$importance["Cumulative Proportion",] > 0.9)
+ind[1]
+```
+
+`PC4: 4`
+
+The first 4 principal components explains for more than 90% of the variance. This implies 
+
+
+##### 4)
+
+```{r, eval=F}
+# hierarchial clustering
+dist_mat <- dist(train.common.imputed[probeset,])
+clustering <- hclust(dist_mat, method = "complete")
+plot(clustering, labels = F, hang=-1)
+
+# cut it into 30 clusters
+cut  <- cutree(clustering, k=30)
+
+# find the clusters related to our top 3 probes
+probeset.top  <- cut[which(cut == cut[probeset[1:3]])]
+
+# get the genes related to the probes
+probes <- hm450[names(probeset.top)]
+genes.top  <- getNearestTSS(probes)$nearestGeneSymbol
+
+write.csv(genes.top, file='top_genes.csv', sep="\t")
+```
+
+![](clustering.png)
+
+
+Most of the genes are related to cytoskeleton and plasma membranes.
 
 
 
